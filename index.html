@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#075E54">
+<title>Gappa Chat</title>
+<style>
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;font-family:system-ui,sans-serif;background:#ECE5DD;color:#111}
+#app{height:100%;display:flex;flex-direction:column;max-width:600px;margin:auto;background:#fff}
+header{background:#075E54;color:#fff;padding:14px 16px;display:flex;align-items:center;gap:12px;font-size:18px;font-weight:600}
+header button{background:none;border:0;color:#fff;font-size:15px;cursor:pointer}
+header .sp{flex:1}
+.hide{display:none!important}
+#login{padding:28px 22px;display:flex;flex-direction:column;gap:12px;justify-content:center;flex:1}
+#login h1{color:#075E54}
+input{border:1px solid #ccc;border-radius:8px;padding:12px;font-size:16px;width:100%}
+.btn{background:#075E54;color:#fff;border:0;border-radius:8px;padding:13px;font-size:16px;cursor:pointer}
+.link{color:#075E54;text-align:center;cursor:pointer;padding:8px}
+#err{color:#c00;font-size:14px}
+#users{flex:1;overflow:auto}
+.row{display:flex;align-items:center;gap:12px;padding:14px;border-bottom:1px solid #eee;cursor:pointer}
+.av{width:44px;height:44px;border-radius:50%;background:#075E54;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
+#chat{flex:1;display:flex;flex-direction:column;min-height:0}
+#msgs{flex:1;overflow:auto;background:#ECE5DD;padding:8px;display:flex;flex-direction:column}
+.b{max-width:78%;padding:8px 11px;border-radius:10px;margin:3px;background:#fff;word-wrap:break-word;white-space:pre-wrap}
+.b.me{align-self:flex-end;background:#DCF8C6}
+.bar{display:flex;gap:8px;padding:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom));background:#f6f6f6}
+.bar input{border-radius:20px}
+.bar button{border-radius:20px;padding:0 18px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header><button id="back" class="hide">←</button><span id="title">Gappa Chat</span><span class="sp"></span><button id="out" class="hide">Logout</button></header>
+
+  <div id="login">
+    <h1>Gappa Chat</h1>
+    <input id="name" class="hide" placeholder="Naam">
+    <input id="email" type="email" placeholder="Email" autocapitalize="none">
+    <input id="pass" type="password" placeholder="Password (kam se kam 6 akshar)">
+    <div id="err"></div>
+    <button class="btn" id="go">Login</button>
+    <div class="link" id="sw">Naya account banao</div>
+  </div>
+
+  <div id="users" class="hide"></div>
+
+  <div id="chat" class="hide">
+    <div id="msgs"></div>
+    <div class="bar"><input id="txt" placeholder="Message likho"><button class="btn" id="send">Send</button></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyADnrrri_hIgR6OrvuuVuB9v9eLto2dfNU",
+  authDomain: "whatsapp-clone-8a6c7.firebaseapp.com",
+  projectId: "whatsapp-clone-8a6c7",
+  storageBucket: "whatsapp-clone-8a6c7.firebasestorage.app",
+  messagingSenderId: "686648057962",
+  appId: "1:686648057962:web:c4a6bb7edb4a73cb4b2a13"
+});
+const auth = firebase.auth(), db = firebase.firestore();
+const $ = id => document.getElementById(id);
+let signup = false, unsubMsgs = null, unsubUsers = null, me = null;
+
+function show(v){
+  ["login","users","chat"].forEach(x => $(x).classList.toggle("hide", x !== v));
+  $("back").classList.toggle("hide", v !== "chat");
+  $("out").classList.toggle("hide", v === "login");
+  if (v !== "chat") $("title").textContent = "Gappa Chat";
+}
+
+$("sw").onclick = () => {
+  signup = !signup;
+  $("name").classList.toggle("hide", !signup);
+  $("go").textContent = signup ? "Account banao" : "Login";
+  $("sw").textContent = signup ? "Account hai? Login karo" : "Naya account banao";
+  $("err").textContent = "";
+};
+
+$("go").onclick = async () => {
+  $("err").textContent = "";
+  const email = $("email").value.trim(), pass = $("pass").value, name = $("name").value.trim();
+  try {
+    if (signup) {
+      if (!name) { $("err").textContent = "Naam likho"; return; }
+      const r = await auth.createUserWithEmailAndPassword(email, pass);
+      await db.collection("users").doc(r.user.uid).set({ name, email, createdAt: Date.now() });
+    } else {
+      await auth.signInWithEmailAndPassword(email, pass);
+    }
+  } catch (e) { $("err").textContent = e.message; }
+};
+
+$("out").onclick = () => auth.signOut();
+$("back").onclick = () => { if (unsubMsgs) unsubMsgs(); show("users"); };
+
+auth.onAuthStateChanged(u => {
+  me = u;
+  if (unsubUsers) { unsubUsers(); unsubUsers = null; }
+  if (!u) { show("login"); return; }
+  show("users");
+  unsubUsers = db.collection("users").onSnapshot(snap => {
+    const box = $("users"); box.textContent = "";
+    snap.forEach(d => {
+      if (d.id === u.uid) return;
+      const n = d.data().name || d.data().email || "User";
+      const row = document.createElement("div"); row.className = "row";
+      const av = document.createElement("div"); av.className = "av"; av.textContent = n[0].toUpperCase();
+      const nm = document.createElement("div"); nm.textContent = n;
+      row.append(av, nm);
+      row.onclick = () => openChat(d.id, n);
+      box.appendChild(row);
+    });
+    if (!box.children.length) box.textContent = "Abhi koi dusra user nahi hai. Dost ko link bhejo aur account banane bolo.";
+  }, e => { $("users").textContent = "Error: " + e.message; });
+});
+
+function openChat(otherId, name){
+  const chatId = [me.uid, otherId].sort().join("_");
+  $("title").textContent = name;
+  show("chat");
+  $("msgs").textContent = "";
+  if (unsubMsgs) unsubMsgs();
+  unsubMsgs = db.collection("chats").doc(chatId).collection("messages").orderBy("createdAt")
+    .onSnapshot(snap => {
+      const box = $("msgs"); box.textContent = "";
+      snap.forEach(d => {
+        const m = d.data();
+        const b = document.createElement("div");
+        b.className = "b" + (m.senderId === me.uid ? " me" : "");
+        b.textContent = m.text;
+        box.appendChild(b);
+      });
+      box.scrollTop = box.scrollHeight;
+    }, e => { $("msgs").textContent = "Error: " + e.message; });
+  $("send").onclick = async () => {
+    const t = $("txt").value.trim(); if (!t) return;
+    $("txt").value = "";
+    try {
+      await db.collection("chats").doc(chatId).collection("messages")
+        .add({ text: t, senderId: me.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    } catch (e) { alert(e.message); }
+  };
+  $("txt").onkeydown = e => { if (e.key === "Enter") $("send").click(); };
+}
+</script>
+</body>
+</html>
