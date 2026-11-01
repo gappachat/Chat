@@ -1,10 +1,12 @@
 <!DOCTYPE html>
-<html lang="hi">
+<html lang="mr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#075E54">
 <title>Gappa Chat</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
 *{box-sizing:border-box;margin:0}
 html,body{height:100%;font-family:system-ui,sans-serif;background:#ECE5DD;color:#111}
@@ -120,6 +122,7 @@ auth.onAuthStateChanged(u => {
     const box = $("users"); box.textContent = "";
     snap.forEach(d => {
       if (d.id === u.uid) return;
+      // Delivered: jab tak app khula hai, dusre ke bheje messages "delivered" mark honge
       if (!deliv[d.id]) {
         const cid = [u.uid, d.id].sort().join("_");
         deliv[d.id] = db.collection("chats").doc(cid).collection("messages")
@@ -159,6 +162,7 @@ function openChat(otherId, name){
           t.textContent = (m.seen || m.delivered) ? "✓✓" : "✓";
           b.appendChild(t);
         } else if (!m.seen && !d.metadata.hasPendingWrites) {
+          // Samorchya ne chat ughadla = seen
           d.ref.update({ seen: true, delivered: true }).catch(() => {});
         }
         box.appendChild(b);
@@ -176,6 +180,7 @@ function openChat(otherId, name){
   };
   $("txt").onkeydown = e => { if (e.key === "Enter") $("send").click(); };
 }
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 </script>
 </body>
 </html>
