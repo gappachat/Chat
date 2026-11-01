@@ -26,6 +26,8 @@ input{border:1px solid #ccc;border-radius:8px;padding:12px;font-size:16px;width:
 #msgs{flex:1;overflow:auto;background:#ECE5DD;padding:8px;display:flex;flex-direction:column}
 .b{max-width:78%;padding:8px 11px;border-radius:10px;margin:3px;background:#fff;word-wrap:break-word;white-space:pre-wrap}
 .b.me{align-self:flex-end;background:#DCF8C6}
+.tk{font-size:12px;margin-left:8px;color:#8a8a8a;white-space:nowrap;letter-spacing:-2px}
+.tk.seen{color:#34B7F1}
 .bar{display:flex;gap:8px;padding:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom));background:#f6f6f6}
 .bar input{border-radius:20px}
 .bar button{border-radius:20px;padding:0 18px}
@@ -68,6 +70,12 @@ firebase.initializeApp({
 const auth = firebase.auth(), db = firebase.firestore();
 const $ = id => document.getElementById(id);
 let signup = false, unsubMsgs = null, unsubUsers = null, me = null;
+let deliv = {};
+
+function stopDeliv(){
+  Object.values(deliv).forEach(f => f());
+  deliv = {};
+}
 
 function show(v){
   ["login","users","chat"].forEach(x => $(x).classList.toggle("hide", x !== v));
@@ -104,12 +112,20 @@ $("back").onclick = () => { if (unsubMsgs) unsubMsgs(); show("users"); };
 auth.onAuthStateChanged(u => {
   me = u;
   if (unsubUsers) { unsubUsers(); unsubUsers = null; }
+  if (unsubMsgs) { unsubMsgs(); unsubMsgs = null; }
+  stopDeliv();
   if (!u) { show("login"); return; }
   show("users");
   unsubUsers = db.collection("users").onSnapshot(snap => {
     const box = $("users"); box.textContent = "";
     snap.forEach(d => {
       if (d.id === u.uid) return;
+      if (!deliv[d.id]) {
+        const cid = [u.uid, d.id].sort().join("_");
+        deliv[d.id] = db.collection("chats").doc(cid).collection("messages")
+          .where("senderId", "==", d.id).where("delivered", "==", false)
+          .onSnapshot(s => { s.forEach(x => x.ref.update({ delivered: true }).catch(() => {})); }, () => {});
+      }
       const n = d.data().name || d.data().email || "User";
       const row = document.createElement("div"); row.className = "row";
       const av = document.createElement("div"); av.className = "av"; av.textContent = n[0].toUpperCase();
@@ -133,9 +149,18 @@ function openChat(otherId, name){
       const box = $("msgs"); box.textContent = "";
       snap.forEach(d => {
         const m = d.data();
+        const mine = m.senderId === me.uid;
         const b = document.createElement("div");
-        b.className = "b" + (m.senderId === me.uid ? " me" : "");
-        b.textContent = m.text;
+        b.className = "b" + (mine ? " me" : "");
+        b.appendChild(document.createTextNode(m.text));
+        if (mine) {
+          const t = document.createElement("span");
+          t.className = "tk" + (m.seen ? " seen" : "");
+          t.textContent = (m.seen || m.delivered) ? "✓✓" : "✓";
+          b.appendChild(t);
+        } else if (!m.seen && !d.metadata.hasPendingWrites) {
+          d.ref.update({ seen: true, delivered: true }).catch(() => {});
+        }
         box.appendChild(b);
       });
       box.scrollTop = box.scrollHeight;
@@ -145,7 +170,8 @@ function openChat(otherId, name){
     $("txt").value = "";
     try {
       await db.collection("chats").doc(chatId).collection("messages")
-        .add({ text: t, senderId: me.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+        .add({ text: t, senderId: me.uid, delivered: false, seen: false,
+               createdAt: firebase.firestore.FieldValue.serverTimestamp() });
     } catch (e) { alert(e.message); }
   };
   $("txt").onkeydown = e => { if (e.key === "Enter") $("send").click(); };
