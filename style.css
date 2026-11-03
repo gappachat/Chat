@@ -1,85 +1,31 @@
-firebase.initializeApp({
-  apiKey: "AIzaSyADnrrri_hIgR6OrvuuVuB9v9eLto2dfNU",
-  authDomain: "whatsapp-clone-8a6c7.firebaseapp.com",
-  projectId: "whatsapp-clone-8a6c7",
-  storageBucket: "whatsapp-clone-8a6c7.firebasestorage.app",
-  messagingSenderId: "686648057962",
-  appId: "1:686648057962:web:c4a6bb7edb4a73cb4b2a13"
-});
-const auth = firebase.auth(), db = firebase.firestore();
-const $ = id => document.getElementById(id);
-let signup = false, unsubMsgs = null, unsubUsers = null, me = null;
-let cur = null;
-let subs = {}, info = {}, unreadDocs = {};
-
-function stopAll(){
-  Object.values(subs).forEach(a => a.forEach(f => f()));
-  subs = {}; info = {}; unreadDocs = {};
-}
-function toDate(ts){ return ts && ts.toDate ? ts.toDate() : null; }
-function fmtTime(ts){
-  const d = toDate(ts); if (!d) return "";
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-function fmtDay(ts){
-  const d = toDate(ts); if (!d) return "";
-  const n = new Date();
-  if (d.toDateString() === n.toDateString()) return fmtTime(ts);
-  return d.getDate() + "/" + (d.getMonth() + 1);
-}
-function preview(m){ return m.img ? "📷 Photo" : (m.text || ""); }
-
-function show(v){
-  ["login","users","chat"].forEach(x => $(x).classList.toggle("hide", x !== v));
-  $("back").classList.toggle("hide", v !== "chat");
-  $("out").classList.toggle("hide", v === "login");
-  if (v !== "chat") $("title").textContent = "Gappa Chat";
-}
-
-document.addEventListener("click", () => {
-  if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
-}, { once: true });
-
-function notify(title, body){
-  if (!("Notification" in window) || Notification.permission !== "granted") return;
-  if (!navigator.serviceWorker) return;
-  navigator.serviceWorker.ready.then(r => r.showNotification(title, {
-    body, icon: "icon-512.png", badge: "icon-512.png", tag: "gappa-" + title, renotify: true
-  })).catch(() => {});
-}
-
-$("sw").onclick = () => {
-  signup = !signup;
-  $("name").classList.toggle("hide", !signup);
-  $("go").textContent = signup ? "Account banao" : "Login";
-  $("sw").textContent = signup ? "Account hai? Login karo" : "Naya account banao";
-  $("err").textContent = "";
-};
-
-$("go").onclick = async () => {
-  $("err").textContent = "";
-  const email = $("email").value.trim(), pass = $("pass").value, name = $("name").value.trim();
-  try {
-    if (signup) {
-      if (!name) { $("err").textContent = "Naam likho"; return; }
-      const r = await auth.createUserWithEmailAndPassword(email, pass);
-      await db.collection("users").doc(r.user.uid).set({ name, email, createdAt: Date.now() });
-    } else {
-      await auth.signInWithEmailAndPassword(email, pass);
-    }
-  } catch (e) { $("err").textContent = e.message; }
-};
-
-$("out").onclick = () => auth.signOut();
-$("back").onclick = () => { if (unsubMsgs) unsubMsgs(); unsubMsgs = null; cur = null; show("users"); renderList(); };
-$("ov").onclick = () => $("ov").classList.add("hide");
-
-function markIfOpen(oid){
-  if (cur === oid && !document.hidden) {
-    (unreadDocs[oid] || []).forEach(d => d.ref.update({ seen: true, delivered: true }).catch(() => {}));
-    if (info[oid]) info[oid].unread = 0;
-  }
-}
-document.addEventListener("visibilitychange", () => {
-  if (!document.hidden && cur) { markIfOpen(cur); renderList(); }
-});
+*{box-sizing:border-box;margin:0;font-family:system-ui,sans-serif}
+html,body{height:100%;background:#e5ddd5}
+.hidden{display:none!important}
+.screen{display:flex;flex-direction:column;height:100dvh;max-width:600px;margin:auto;background:#fff}
+#login{align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center}
+.logo{width:96px;height:96px;border-radius:24px}
+#login h1{color:#075e54}
+#login input{width:100%;padding:14px;border:1px solid #ccc;border-radius:10px;font-size:16px}
+button{border:0;cursor:pointer}
+#go{width:100%;padding:14px;background:#25d366;color:#fff;font-size:17px;border-radius:10px;font-weight:600}
+#err{color:#c00}
+header{display:flex;align-items:center;gap:10px;padding:14px;padding-top:max(14px,env(safe-area-inset-top));background:#075e54;color:#fff;font-size:18px}
+header b{flex:1}
+header button{background:none;color:#fff;font-size:22px}
+.search{margin:10px;padding:11px 14px;border:0;background:#f0f2f5;border-radius:20px;font-size:15px}
+#users{overflow:auto;flex:1}
+.row{display:flex;gap:12px;align-items:center;padding:12px 16px;border-bottom:1px solid #f0f0f0;cursor:pointer}
+.row:active{background:#f5f5f5}
+.row small{display:block;color:#888}
+.av{width:44px;height:44px;border-radius:50%;background:#25d366;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;flex:none}
+header .av{width:36px;height:36px;background:#128c7e}
+.empty{text-align:center;color:#888;padding:40px 20px}
+#chat{background:#e5ddd5}
+#msgs{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:6px}
+.bub{max-width:80%;padding:7px 10px;border-radius:10px;font-size:15px;word-break:break-word;box-shadow:0 1px 1px #0002;display:flex;flex-direction:column}
+.bub i{font-size:11px;color:#667;align-self:flex-end;margin-top:2px;font-style:normal}
+.me{background:#dcf8c6;align-self:flex-end;border-top-right-radius:0}
+.they{background:#fff;align-self:flex-start;border-top-left-radius:0}
+.bar{display:flex;gap:8px;padding:8px;padding-bottom:max(8px,env(safe-area-inset-bottom));background:#f0f0f0}
+.bar input{flex:1;padding:12px 16px;border:0;border-radius:24px;font-size:16px}
+.bar button{width:46px;height:46px;border-radius:50%;background:#25d366;color:#fff;font-size:18px}
