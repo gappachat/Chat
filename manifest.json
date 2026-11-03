@@ -1,11 +1,11 @@
 {
-  "name": "Gappa Chat",
-  "short_name": "Gappa Chat",
-  "start_url": "./",
+  "name": "GappaChat",
+  "short_name": "GappaChat",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#075E54",
-  "theme_color": "#075E54",
+  "background_color": "#075e54",
+  "theme_color": "#075e54",
   "icons": [
     {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
   ]
