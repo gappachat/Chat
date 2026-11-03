@@ -176,5 +176,10 @@ $('go').onclick = () => {
   if(!name || id.length < 6){ $('err').textContent = 'Barobar nav aani number taka'; return; }
   me = {name, id}; localStorage.setItem('me', JSON.stringify(me)); start();
 };
-$('out').onclick = () => { if(confirm('Logout karaycha?')){ localStorage.removeItem('me'); location.reload(); } };
-if(me) start(); else sh
+$('out').onclick = () => { if(confirm('Logout karaycha?')){ localStorage.removeItem('me'); location.reload(); }
+                        
+  if(me) start(); else show('login');
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
